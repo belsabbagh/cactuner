@@ -43,11 +43,10 @@ def compress(img: np.ndarray, window_shape=None):
     nrows, ncols = window_shape
     assert h % nrows == 0, f"{h} rows is not evenly divisible by {nrows}"
     assert w % ncols == 0, f"{w} cols is not evenly divisible by {ncols}"
-    new_shape = h // nrows, w // ncols
     buffer = []
     for window in img_slicer(img, window_shape):
         buffer.append(encode(window))
-    return CompressedImage(np.array(buffer), img.shape, window_shape, new_shape)
+    return np.array(buffer)
 
 
 def decompress(
@@ -56,6 +55,9 @@ def decompress(
     pass
 
 
-img = np.random.randint(0, 2, size=(12, 12))
-c = compress(img)
-print(c)
+def compression_ratio(img, compression):
+    return np.prod(img.shape) / sum([len(i) for i in compression])
+
+
+def rel_data_redundancy(img, compression):
+    return 1 - 1 / compression_ratio(img, compression)

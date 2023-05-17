@@ -14,10 +14,10 @@ class GeneticAlgorithm(object):
 
     def __init__(self, **kwargs):
         """Initialize the Genetic Algorithm class."""
-        self._fitness = kwargs.get('fitness')
-        self._crossover = kwargs.get('crossover')
-        self._mutate = kwargs.get('mutate')
-        self._select = kwargs.get('select')
+        self._fitness = kwargs.get("fitness")
+        self._crossover = kwargs.get("crossover")
+        self._mutate = kwargs.get("mutate")
+        self._select = kwargs.get("select")
 
     @classmethod
     def create(
@@ -26,14 +26,12 @@ class GeneticAlgorithm(object):
         fitness: Callable[[Individual, any], float] = None,
         crossover=None,
         mutate=None,
-        select=None
+        select=None,
     ):
         """Create a Genetic Algorithm object."""
         if not issubclass(cls, GeneticAlgorithm):
-            raise TypeError(
-                f"{cls} is not a subclass of GeneticAlgorithm.")
-        return cls(**cls.build_attributes(
-            validate, fitness, crossover, mutate, select))
+            raise TypeError(f"{cls} is not a subclass of GeneticAlgorithm.")
+        return cls(**cls.build_attributes(validate, fitness, crossover, mutate, select))
 
     @staticmethod
     def build_attributes(
@@ -41,15 +39,19 @@ class GeneticAlgorithm(object):
         fitness: Callable[[Individual, any], float],
         crossover,
         mutate,
-        select
+        select,
     ):
         """Initialize the default attributes."""
+        if fitness is None:
+            raise ValueError("No fitness function was defined.")
         return {
-            'validate': validate if validate is not None else lambda x: True,
-            'fitness': fitness if fitness is not None else lambda x, y: 0,
-            'crossover': crossover if crossover is not None else lambda x, y: x,
-            'mutate': mutate if mutate is not None else lambda x: x,
-            'select': select if select is not None else lambda x: x[:int(len(x)*0.05)]
+            "validate": validate if validate is not None else lambda x: True,
+            "fitness": fitness,
+            "crossover": crossover if crossover is not None else lambda x, y: x,
+            "mutate": mutate if mutate is not None else lambda x: x,
+            "select": select
+            if select is not None
+            else lambda x: x[: int(len(x) * 0.05)],
         }
 
     def get_fitness(self):
@@ -66,30 +68,45 @@ class GeneticAlgorithm(object):
 
     def _check_params(self, population, generations, zero_best, log, reverse):
         if zero_best and reverse:
-            raise ValueError('Cannot set zero_best and reverse to True.')
+            raise ValueError("Cannot set zero_best and reverse to True.")
 
     def run(
         self,
         population: list[Individual],
         generations,
-        zero_best: bool = True,
-        debug: bool = False,
-        max_fitness: bool = False
+        zero_best: bool = False,
+        max_fitness: bool = False,
+        verbose: bool = False,
     ):
-        self._check_params(population, generations,
-                           zero_best, debug, max_fitness)
-        pool = population
+        self._check_params(population, generations, zero_best, verbose, max_fitness)
+        return self._run(
+            population, generations, self._fitness, self._new_pool, max_fitness, verbose
+        )
+
+    @staticmethod
+    def _run(
+        population: list[Individual],
+        generations,
+        fitness,
+        create_new_pool,
+        max_fitness: bool = False,
+        verbose: bool = False,
+    ):
+        size = len(population)
+        pool = sorted(population, key=lambda x: fitness(x), reverse=max_fitness)
         """Run the Genetic Algorithm."""
-        for gen_i in range(1, generations+1):
-            pool = sorted(pool, key=lambda x: self._fitness(x),
-                          reverse=max_fitness)
+        for gen_i in range(1, generations + 1):
             best_ind = pool[0]
-            best_score = self._fitness(best_ind)
-            if debug:
-                print(self._log_msg(gen_i, best_ind, best_score, len(pool)))
-            if zero_best and best_score <= 0:
-                return [pool[0]]
-            pool = self._new_pool(pool)
+            best_score = fitness(best_ind)
+            if verbose:
+                print(
+                    GeneticAlgorithm._log_msg(
+                        gen_i, best_ind.get_solution(), best_score, len(pool)
+                    )
+                )
+            pool = sorted(
+                create_new_pool(pool), key=lambda x: fitness(x), reverse=max_fitness
+            )[:size]
         return pool
 
     def _reproduce(self, parents: list[Individual]):
@@ -101,14 +118,15 @@ class GeneticAlgorithm(object):
             new_gen.append(kids[1])
         return [self._mutate(ind) for ind in new_gen]
 
-    def _log_msg(self, generation, best: Individual, fitness_score, pool_size):
+    @staticmethod
+    def _log_msg(generation, best: Individual, fitness_score, pool_size):
         """Generate a log message."""
-        return f'Gen {generation}:\tBest: {"".join([str(i) for i in best.get_chromosome()])}\tFitness: {fitness_score}\tPool: {pool_size}'
+        return f"Gen {generation: >8}: Best: {best} Fitness: {round(fitness_score, 5): <10} Pool: {pool_size}"
 
     @staticmethod
     def _get_ratio(population: list[Individual], ratio: float):
         """Return the fittest individual in the population."""
-        return population[:int(len(population)*ratio)]
+        return population[: int(len(population) * ratio)]
 
     def _new_pool(self, pool: list[Individual]):
         """Create a new pool of individuals."""
