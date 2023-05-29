@@ -1,5 +1,6 @@
 import random
 from typing import Callable
+import warnings
 
 from src.ga.individual import Individual
 
@@ -92,42 +93,45 @@ class GeneticAlgorithm(object):
         max_fitness: bool = False,
         verbose: bool = False,
     ):
-        size = len(population)
-        pool = sorted(population, key=lambda x: fitness(x), reverse=max_fitness)
+        pool = population
         """Run the Genetic Algorithm."""
         for gen_i in range(1, generations + 1):
-            best_ind = pool[0]
-            best_score = fitness(best_ind)
+            if pool == []:
+                raise RuntimeError("There were no survivors.")
+            pool = sorted(
+                [(i, fitness(i)) for i in pool], key=lambda x: x[1], reverse=max_fitness
+            )
+            best_ind, best_score = pool[0]
             if verbose:
                 print(
                     GeneticAlgorithm._log_msg(
                         gen_i, best_ind.get_solution(), best_score, len(pool)
                     )
                 )
-            pool = sorted(
-                create_new_pool(pool), key=lambda x: fitness(x), reverse=max_fitness
-            )[:size]
+            pool = create_new_pool(pool)
+        if fitness(pool[0]) == 0 and max_fitness:
+            warnings.warn("No solution was found.")
         return pool
 
     def _reproduce(self, parents: list[Individual]):
         """Create a new generation of individuals."""
         new_gen = []
-        for _ in range(len(parents)):
-            kids = self._crossover(random.choice(parents), random.choice(parents))
-            new_gen.append(kids[0])
-            new_gen.append(kids[1])
-        return [self._mutate(ind) for ind in new_gen]
+        for i in range(1, len(parents)):
+            kids = self._crossover(parents[i], parents[i - 1])
+            new_gen.extend([self._mutate(ind) for ind in kids])
+        return new_gen
 
     @staticmethod
     def _log_msg(generation, best: Individual, fitness_score, pool_size):
         """Generate a log message."""
-        return f"Gen {generation: >8}: Best: {best} Fitness: {round(fitness_score, 5): <10} Pool: {pool_size}"
+        return f"Gen {generation: >6}: Best: {best} Fitness: {round(fitness_score, 5): <10} Pool: {pool_size}"
 
     @staticmethod
     def _get_ratio(population: list[Individual], ratio: float):
         """Return the fittest individual in the population."""
         return population[: int(len(population) * ratio)]
 
-    def _new_pool(self, pool: list[Individual]):
+    def _new_pool(self, pool: list[tuple[Individual, float]]):
         """Create a new pool of individuals."""
-        return self._reproduce(self._get_ratio(pool, 0.5)) + self._select(pool)
+        individuals = [i for i, _ in pool]
+        return self._reproduce(self._select(pool)) + individuals[:5]

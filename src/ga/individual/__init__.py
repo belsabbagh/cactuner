@@ -101,7 +101,11 @@ class CACIndividual:
 
     @classmethod
     def mate(cls, par1, par2):
-        c1, c2 = _create_child_chromosome(par1.get_chromosome(), par2.get_chromosome())
+        c1, c2 = [], []
+        for gp1, gp2 in zip(par1.get_chromosome(), par2.get_chromosome()):
+            r1, r2 = _create_child_chromosome(gp1, gp2)
+            c1.append(r1)
+            c2.append(r2)
         return cls(c1, as_is=True), cls(c2, as_is=True)
 
     @classmethod
@@ -127,3 +131,9 @@ class CACIndividual:
 
     def get_solution(self):
         return self.to_list()
+    
+    def __repr__(self) -> str:
+        return f"{self.get_solution()}"
+    
+    def __str__(self) -> str:
+        return f"{self.get_solution()}"
